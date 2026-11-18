@@ -2,7 +2,7 @@
 // Player, bolts, gravity wells, enemies, pickups, waves, bosses, win/lose.
 import { ARENA, DIFFICULTIES, ENEMY_KINDS, PLAYER, RELICS, ROUTES, STAR_POS, STEP, TOTAL_WAVES, UNLOCKS, UPGRADES, WAVE_NAMES, WAVES } from './config.js';
 import { spawnAtEdge, spawnCluster, spawnEnemy, updateEnemy } from './enemies.js';
-import { applyUpgrade, boltDamage, boltsPerShot, chainDamage, chainRadius, dashCooldown, fireInterval, ownedCount, playerSpeed, relicCount, rollChoices, scoreMultiplier, starBurn, wellDamage, wellMaxCharges, wellRadius, wellRechargeTime } from './upgrades.js';
+import { applyUpgrade, boltDamage, boltsPerShot, chainDamage, chainRadius, comboWindow, damageTakenMult, dashCooldown, fireInterval, hullRegen, ownedCount, playerSpeed, relicCount, rollChoices, scoreMultiplier, shardGain, starBurn, starDrainMult, starSiphonHeal, wellDamage, wellDuration, wellKillBonus, wellMaxCharges, wellPull, wellRadius, wellRechargeTime } from './upgrades.js';
 import { makeRandom, pickRandom } from './random.js';
 import { SCREEN_LOSE, SCREEN_PLAY, SCREEN_UPGRADE, SCREEN_WIN } from './state.js';
 
@@ -123,7 +123,7 @@ function killEnemy(run, e, sound, fromWell) {
     run.stats.wellKills += 1;
     if (e.kind === 'crab') run.crabWellKills += 1;
   }
-  run.combo += 1; run.comboTimer = 3;
+  run.combo += 1; run.comboTimer = comboWindow(run);
   run.bestCombo = Math.max(run.bestCombo, run.combo);
   // A big combo gets a big callout, every 5 chain.
   if (run.combo > 0 && run.combo % 5 === 0) {
@@ -131,7 +131,8 @@ function killEnemy(run, e, sound, fromWell) {
     run.comboCalloutTimer = 1.4;
   }
   const mult = 1 + Math.min(run.combo, 20) * 0.05;
-  const gained = Math.round(e.score * mult * scoreMultiplier(run));
+  // Salvage: a well kill pays its bonus on top of the normal score.
+  const gained = Math.round(e.score * mult * scoreMultiplier(run)) + (fromWell ? wellKillBonus(run) : 0);
   run.score += gained;
   addFloat(run, e.x, e.y, `+${gained}`, '#3dff9e');
   burst(run, e.x, e.y, e.colour, 16, 180);
@@ -169,11 +170,13 @@ function killEnemy(run, e, sound, fromWell) {
 function hurtPlayer(run, dmg, sound) {
   const p = run.player;
   if (p.dashTimer > 0 || !p.alive || p.invuln > 0) return;
-  p.hp -= dmg; p.hurtFlash = 1; p.invuln = 0.8;
-  run.stats.damageTaken += dmg;
+  // Bulwark blunts the hit — never below 1, a hit is still a hit.
+  const taken = Math.max(1, Math.round(dmg * damageTakenMult(run)));
+  p.hp -= taken; p.hurtFlash = 1; p.invuln = 0.8;
+  run.stats.damageTaken += taken;
   run.combo = 0;
   run.shake = Math.max(run.shake, 7);
-  addFloat(run, p.x, p.y - 24, `-${dmg}`, '#ff3b5c');
+  addFloat(run, p.x, p.y - 24, `-${taken}`, '#ff3b5c');
   burst(run, p.x, p.y, '#ff3b5c', 8, 120);
   if (sound) sound.hurt();
   if (p.hp <= 30 && p.hp > 0) run.stats.closeCalls += 1;
@@ -186,7 +189,9 @@ function hurtPlayer(run, dmg, sound) {
 }
 
 function hurtStar(run, dmg, sound) {
-  const allowed = Math.min(dmg, run.starDrainBudget);
+  // Starward slows the drain: the incoming bleed is reduced before the
+  // per-second budget caps it, so the star loses less each second.
+  const allowed = Math.min(dmg * starDrainMult(run), run.starDrainBudget);
   run.starDrainBudget -= allowed;
   run.starHp -= allowed; run.starFlash = 1;
   // No floating "-N STAR /s" text: it drifted up into the star's HP bar.
@@ -219,6 +224,16 @@ function detonateWell(run, w, sound) {
   for (const e of run.enemies) {
     if (!first.includes(e) && !e.dead && Math.hypot(e.x - w.x, e.y - w.y) < r + e.radius) damageEnemy(run, e, dmg, sound, true);
   }
+  // Star Siphon: every detonation feeds a little of the blast back into
+  // the star — the well that saves the star also mends it.
+  const siphon = starSiphonHeal(run);
+  if (siphon > 0) {
+    run.starHp = Math.min(run.starMaxHp, run.starHp + siphon);
+    addFloat(run, STAR_POS.x, STAR_POS.y - 44, `+${siphon}`, '#3dff9e');
+  }
+  // A blast close to the star makes the star flare — bright, big, and
+  // unmistakably the thing the whole fight is about.
+  if (Math.hypot(w.x - STAR_POS.x, w.y - STAR_POS.y) < 320) run.starFlare = 1;
 }
 
 // One fixed step. `input` is a snapshot; `rng` is the run's seeded generator.
@@ -232,6 +247,8 @@ export function stepSimulation(run, input, rng, sound) {
   const p = run.player;
   p.hurtFlash = Math.max(0, p.hurtFlash - dt * 4);
   p.invuln = Math.max(0, p.invuln - dt);
+  // Nanoweave: the hull knits itself back together while you fly.
+  if (p.alive && p.hp < p.maxHp) p.hp = Math.min(p.maxHp, p.hp + hullRegen(run) * dt);
   run.starFlash = Math.max(0, run.starFlash - dt * 4);
   run.starDrainBudget = Math.min(6, run.starDrainBudget + 6 * dt);
   run.waveBanner = Math.max(0, run.waveBanner - dt);
@@ -273,7 +290,8 @@ export function stepSimulation(run, input, rng, sound) {
   if (input.throwWell && run.wellCharges > 0) {
     const wx = Math.max(ARENA.x + 20, Math.min(ARENA.x + ARENA.width - 20, input.aimX));
     const wy = Math.max(ARENA.y + 20, Math.min(ARENA.y + ARENA.height - 20, input.aimY));
-    run.wells.push({ x: wx, y: wy, radius: wellRadius(run), pull: 340, timer: 2.2, max: 2.2 });
+    const dur = wellDuration(run);
+    run.wells.push({ x: wx, y: wy, radius: wellRadius(run), pull: wellPull(run), timer: dur, max: dur });
     run.wellCharges -= 1;
     run.stats.wellsThrown += 1;
     ring(run, wx, wy, '#00e5ff', 90);
@@ -391,7 +409,7 @@ export function stepSimulation(run, input, rng, sound) {
     }
     if (d < PLAYER.pickupRadius + 10) {
       if (pk.kind === 'heart') { p.hp = Math.min(p.maxHp, p.hp + 18); addFloat(run, p.x, p.y - 24, '+18 HP', '#3dff9e'); }
-      else { run.score += 25; run.shards += 1; addFloat(run, p.x, p.y - 24, '+25  ◆+1', '#ffd23e'); }
+      else { const sg = shardGain(run); run.score += 25; run.shards += sg; addFloat(run, p.x, p.y - 24, `+25  ◆+${sg}`, '#ffd23e'); }
       pk.life = 0; if (sound) sound.pickup();
     }
   }

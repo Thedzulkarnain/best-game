@@ -2,10 +2,11 @@
 // the real rules forward from a fresh seeded run with the autopilot, for a
 // fixed number of steps, so the frame is what a real game looks like and the
 // same seed always gives the same frame. No mockups, no staged art.
-import { STEP } from './config.js';
+import { STAR_POS, STEP } from './config.js';
 import { autopilotInput } from './autopilot.js';
 import { beginRun, chooseRoad, chooseUpgrade, startWave, stepSimulation } from './simulation.js';
 import { makeRandom } from './random.js';
+import { loadMeta } from './meta.js';
 import { createRun } from './state.js';
 import { SCREEN_LOSE, SCREEN_PLAY, SCREEN_TITLE, SCREEN_UPGRADE, SCREEN_WIN } from './state.js';
 
@@ -28,9 +29,15 @@ function runStepsStopAtUpgrade(run, rng, steps) {
 export function stageShot(name, run) {
   const seed = name === 'boss' ? 777 : name === 'cover' ? 42 : 7;
   const rng = makeRandom(seed);
+  // The staged run is a fresh object, so it loses the best score the
+  // boot code loaded from localStorage — restore it, or the HUD's FORGE
+  // panel reads "BEST — no runs yet" on a shot that is meant to show a
+  // run already in progress. The seeded meta is a real completed run.
+  const metaBest = loadMeta().best || 0;
   const fresh = createRun(seed);
   for (const key of Object.keys(run)) delete run[key];
   Object.assign(run, fresh);
+  run.best = metaBest;
   run.rng = rng;
   if (name === 'title') {
     beginRun(run, rng);
@@ -56,6 +63,7 @@ export function stageShot(name, run) {
     const fresh2 = createRun(seed);
     for (const key of Object.keys(run)) delete run[key];
     Object.assign(run, fresh2);
+    run.best = metaBest;
     run.rng = rng2;
     beginRun(run, rng2);
     runSteps(run, rng2, best);
@@ -70,15 +78,18 @@ export function stageShot(name, run) {
   }
   // cover: play a REAL full run from Wave 1 to the Wave 7 boss with the
   // autopilot (real score in the thousands, real upgrades owned, real
-  // combo), then take the densest moment of the boss fight — boss alive,
-  // a gravity well detonating a cluster, escorts around it. Two
-  // deterministic passes over the same seed: the first finds that step,
-  // the second replays to it, so the cover is a real frame, never a lull.
+  // combo), then take the peak moment of the boss fight — boss alive and
+  // close to the star, an armed well holding a cluster in its ring, the
+  // star flaring, floating feedback visible, no banner or message text
+  // across the frame. Two deterministic passes over the same seed: the
+  // first finds that step, the second replays to it, so the cover is a
+  // real frame, never a lull.
   const best = findCoverStep(seed);
   const rng2 = makeRandom(seed);
   const fresh2 = createRun(seed);
   for (const key of Object.keys(run)) delete run[key];
   Object.assign(run, fresh2);
+  run.best = metaBest;
   run.rng = rng2;
   beginRun(run, rng2);
   runSteps(run, rng2, best);
@@ -86,23 +97,70 @@ export function stageShot(name, run) {
 }
 
 function densityScore(probe) {
-  // Particles (a detonation in progress) and combo count most: they are
-  // what separates a mid-action frame from a lull between explosions.
-  let score = probe.enemies.length * 5 + probe.bolts.length + probe.particles.length * 2
-    + probe.wells.length * 6 + probe.enemyBolts.length + (probe.boss ? 40 : 0)
-    + probe.combo * 2;
+  // The peak moment, frozen mid-climax: ONE large focal point dead
+  // centre — the boss with the action wrapped around it — the star
+  // flaring as the brightest thing on the board, floating feedback
+  // visible, and no banner or message text across the middle.
+  let score = probe.enemies.length * 5 + probe.bolts.length + probe.enemyBolts.length
+    + (probe.boss ? 40 : 0) + probe.combo * 2;
   // A dead combo (x0) reads as a lull even in a dense frame.
   if (probe.combo === 0) score -= 25;
+  // The combo callout is wanted floating feedback — and the renderer now
+  // drops it to the footer band when the boss is dead centre, so it can
+  // never cover the boss. A frame with it up is a plus, not a veto.
+  if (probe.comboCalloutTimer > 0) score += 25;
+  // The wave/phase banner and the green phase message are wide bars
+  // across the same middle band: a frame with either up puts text over
+  // the boss, so both are out.
+  if (probe.waveBanner > 0) score -= 80;
+  if (probe.messageTimer > 0) score -= 80;
+  // The star is the thing being defended: a flaring star (a well just
+  // detonated near it) is bright, big, and the focal point of the shot.
+  score += (probe.starFlare || 0) * 60;
+  // A detonation in progress is a particle blob, not a readable well:
+  // particles count for little, and a screen full of them is penalised.
+  score += Math.min(probe.particles.length, 40);
+  if (probe.particles.length > 80) score -= 30;
+  // Density: fill the centre two-thirds with as many kinds as the wave
+  // offers — variety in the middle reads as a swarm, not a queue.
+  const centreKinds = new Set();
+  for (const e of probe.enemies) {
+    if (e.x > 213 && e.x < 1067 && e.y > 120 && e.y < 600) centreKinds.add(e.kind);
+  }
+  score += centreKinds.size * 12;
+  // Finished-action remnants: pickups dropped by kills and damage
+  // numbers still floating prove the fight has been going, not starting.
+  score += Math.min((probe.pickups || []).length * 5, 25);
+  score += Math.min((probe.floats || []).length * 2, 20);
+  // Two or more placed objects at once: wells are the player's doing,
+  // and two rings on screen prove the mechanic, not a single accident.
+  if (probe.wells.length >= 2) score += 25;
   // Composition: the boss and the wells must be in the open centre of the
   // frame, not hiding behind a side panel or at an edge. An edge boss is
-  // penalised hard, however dense the rest of the frame is.
+  // penalised hard, however dense the rest of the frame is — and the
+  // tightest frame has the boss close to the star, not far from it.
   if (probe.boss) {
     if (probe.boss.x > 300 && probe.boss.x < 980 && probe.boss.y > 180 && probe.boss.y < 560) score += 40;
     else score -= 80;
+    const bossDist = Math.hypot(probe.boss.x - STAR_POS.x, probe.boss.y - STAR_POS.y);
+    if (bossDist < 200) score += 60;
+    else if (bossDist < 300) score += 40;
+    else if (bossDist > 520) score -= 40;
   }
   for (const w of probe.wells) {
     if (w.x > 300 && w.x < 980 && w.y > 180 && w.y < 560) score += 15;
     else score -= 10;
+    // An armed well (still pulling, ring visible) beats a spent one:
+    // reward the ring and the enemies trapped inside it — three or more
+    // in one ring is the well working at its best.
+    if (w.timer > 0.6) {
+      score += 20;
+      let trapped = 0;
+      for (const e of probe.enemies) {
+        if (Math.hypot(e.x - w.x, e.y - w.y) < w.radius) { score += 8; trapped += 1; }
+      }
+      if (trapped >= 3) score += 25;
+    }
   }
   return score;
 }

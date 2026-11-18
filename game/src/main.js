@@ -10,7 +10,7 @@ import { makeRandom } from './random.js';
 import { renderGame } from './render.js';
 import { stageShot } from './shots.js';
 import { autopilotInput, idleInput } from './autopilot.js';
-import { applyUpgrade, boltDamage, boltsPerShot, chainDamage, fireInterval, wellDamage, wellMaxCharges, wellRadius } from './upgrades.js';
+import { applyUpgrade, boltDamage, boltsPerShot, chainDamage, chainRadius, comboWindow, damageTakenMult, dashCooldown, fireInterval, hullRegen, playerSpeed, scoreMultiplier, shardGain, starBurn, starDrainMult, starSiphonHeal, wellDamage, wellDuration, wellKillBonus, wellMaxCharges, wellPull, wellRadius } from './upgrades.js';
 import { loadMeta, recordRun } from './meta.js';
 
 const canvas = document.getElementById('game');
@@ -173,7 +173,7 @@ window.__game = {
     return { screen: run.screen, score: run.score, wave: run.wave, kills: run.kills, hp: run.player.hp, starHp: run.starHp };
   },
   applyUpgrade: (id) => applyUpgrade(run, id),
-  derived: () => ({ boltDamage: boltDamage(run), boltsPerShot: boltsPerShot(run), fireInterval: fireInterval(run), wellDamage: wellDamage(run), wellRadius: wellRadius(run), wellMaxCharges: wellMaxCharges(run), chainDamage: chainDamage(run), owned: { ...run.upgradesOwned } }),
+  derived: () => ({ boltDamage: boltDamage(run), boltsPerShot: boltsPerShot(run), fireInterval: fireInterval(run), wellDamage: wellDamage(run), wellRadius: wellRadius(run), wellMaxCharges: wellMaxCharges(run), chainDamage: chainDamage(run), chainRadius: chainRadius(run), playerSpeed: playerSpeed(run), starSiphonHeal: starSiphonHeal(run), wellPull: wellPull(run), wellDuration: wellDuration(run), hullRegen: hullRegen(run), comboWindow: comboWindow(run), dashCooldown: dashCooldown(run), scoreMultiplier: scoreMultiplier(run), starBurn: starBurn(run), shardGain: shardGain(run), wellKillBonus: wellKillBonus(run), damageTakenMult: damageTakenMult(run), starDrainMult: starDrainMult(run), owned: { ...run.upgradesOwned }, relics: { ...run.relics } }),
   autoplay: (maxSeconds) => {
     const steps = Math.floor((maxSeconds || 600) / STEP);
     return window.__game.step(steps, 'auto');
