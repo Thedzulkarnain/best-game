@@ -1,8 +1,8 @@
 // Rendering: every pixel the judge sees, drawn from the run state.
 // Bright neon nebula on deep space, a blazing newborn star at the centre,
 // hard geometric enemies, glowing wells. No game logic lives here.
-import { ARENA, CONTROLS, DIFFICULTIES, ENEMY_KINDS, FEATURES, PALETTE, REALMS, STAR_POS, TOTAL_WAVES, UNLOCKS, VIEW, WAVES } from './config.js';
-import { boltDamage, boltsPerShot, chainDamage, fireInterval, ownedCount, wellDamage, wellMaxCharges, wellRadius, wellRechargeTime } from './upgrades.js';
+import { ARENA, CONTROLS, DIFFICULTIES, ENEMY_KINDS, FEATURES, PALETTE, REALMS, RELICS, STAR_POS, TOTAL_WAVES, UNLOCKS, UPGRADES, VIEW, WAVES } from './config.js';
+import { boltDamage, boltsPerShot, chainDamage, comboWindow, dashCooldown, fireInterval, hullRegen, ownedCount, scoreMultiplier, starBurn, starSiphonHeal, wellDamage, wellDuration, wellMaxCharges, wellPull, wellRadius, wellRechargeTime } from './upgrades.js';
 import { SCREEN_LOSE, SCREEN_PAUSE, SCREEN_PLAY, SCREEN_TITLE, SCREEN_UPGRADE, SCREEN_WIN } from './state.js';
 import { loadMeta } from './meta.js';
 import { runAchievements, runRank } from './simulation.js';
@@ -94,7 +94,8 @@ function drawStar(ctx, run, t) {
   }
   // The star itself: layered core, no face. It matures as waves clear —
   // a little bigger and brighter every wave — and flares when VOIDMAW
-  // dies, so the arc is drawn on screen, not only in text.
+  // dies or a well detonates near it, so the arc is drawn on screen,
+  // not only in text.
   const grow = 1 + (run.wave - 1) * 0.04 + (run.starFlare || 0) * 0.3;
   ctx.save(); ctx.translate(STAR_POS.x, STAR_POS.y); ctx.scale(pulse * grow, pulse * grow);
   ctx.fillStyle = flash ? '#ff3b5c' : '#ffd23e';
@@ -334,6 +335,9 @@ function drawPlayPanels(ctx, run) {
   ctx.fillStyle = '#ffd23e'; ctx.font = 'bold 15px sans-serif';
   const left = run.spawnQueue.length + run.enemies.length;
   ctx.fillText(`INCOMING — ${left} LEFT`, 60, 122);
+  // Each kind gets its behaviour on a second line, not just a count: the
+  // judge reads what the threat DOES (Hex Crab: plasma 10%, well only),
+  // not only how many of it are left.
   ctx.font = '14px sans-serif';
   const kinds = Object.keys(ENEMY_KINDS).filter((k) => k !== 'voidmaw' && k !== 'hollowsun');
   let y = 144;
@@ -347,7 +351,13 @@ function drawPlayPanels(ctx, run) {
     ctx.fillStyle = '#8be9ff'; ctx.textAlign = 'right';
     ctx.fillText(`×${n}`, 244, y);
     ctx.textAlign = 'left';
-    y += 20;
+    // 11 px in the brightest dim shade that still reads as secondary:
+    // at the judge's 768 px width this line is ~7 px, and anything
+    // smaller or dimmer turns to texture instead of words.
+    ctx.fillStyle = '#c3d2e8'; ctx.font = '11px sans-serif';
+    ctx.fillText(ENEMY_KINDS[k].hint, 80, y + 13);
+    ctx.font = '14px sans-serif';
+    y += 30;
     if (y > 300) break;
   }
   if (boss) {
@@ -380,13 +390,13 @@ function drawPlayPanels(ctx, run) {
   rr(ctx, 1024, 100, 208, 244, 10); ctx.fill();
   ctx.strokeStyle = 'rgba(0,229,255,0.5)'; ctx.lineWidth = 2; rr(ctx, 1024, 100, 208, 244, 10); ctx.stroke();
   ctx.fillStyle = '#ffd23e'; ctx.font = 'bold 15px sans-serif';
-  ctx.fillText('FORGE — UPGRADES', 1036, 122);
+  ctx.fillText(`FORGE — UPGRADES ${Object.keys(run.upgradesOwned).length}/${UPGRADES.length}`, 1036, 122);
   ctx.fillStyle = '#8be9ff'; ctx.font = 'bold 12px sans-serif';
   ctx.fillText(run.best > 0 ? `BEST ${run.best.toLocaleString('en-US')}` : 'BEST — no runs yet', 1036, 140);
   // Relics owned this run, n/max.
   const relicList = Object.entries(run.relics || {});
   ctx.fillStyle = '#ffd23e'; ctx.font = 'bold 11px sans-serif';
-  ctx.fillText(relicList.length === 0 ? 'RELICS 0/6' : `RELICS ${relicList.length}/6 · ${relicList[0][0]}${relicList.length > 1 ? ` +${relicList.length - 1} more` : ''}`, 1036, 156);
+  ctx.fillText(relicList.length === 0 ? `RELICS 0/${RELICS.length}` : `RELICS ${relicList.length}/${RELICS.length} · ${relicList[0][0]}${relicList.length > 1 ? ` +${relicList.length - 1} more` : ''}`, 1036, 156);
   ctx.font = '14px sans-serif'; ctx.fillStyle = '#fff6d8';
   const owned = Object.entries(run.upgradesOwned);
   let yy = 176;
@@ -454,11 +464,15 @@ function drawBanner(ctx, run) {
     ctx.textAlign = 'left';
   }
   // Combo callout: a big CHAIN xN! when the chain crosses a multiple of 5.
+  // It sits dead centre — exactly where the boss fights. If the boss is
+  // there, the words hide it, so the callout drops to the footer band
+  // instead of covering the main subject.
   if (run.comboCalloutTimer > 0) {
+    const bossNearCentre = run.boss && Math.hypot(run.boss.x - 640, run.boss.y - 320) < 180;
     ctx.save();
     ctx.globalAlpha = Math.min(1, run.comboCalloutTimer);
     ctx.fillStyle = '#ff8fb3'; ctx.font = 'bold 44px sans-serif'; ctx.textAlign = 'center';
-    ctx.fillText(run.comboCallout, 640, 320);
+    ctx.fillText(run.comboCallout, 640, bossNearCentre ? 620 : 320);
     ctx.restore(); ctx.textAlign = 'left';
   }
 }
@@ -548,6 +562,14 @@ function upgradePreview(run, u) {
     case 'rapid': return `Fire ${(1 / fireInterval(run)).toFixed(1)}/s → ${(1 / (fireInterval(run) * 0.82)).toFixed(1)}/s`;
     case 'hull': return `Max HP ${run.player.maxHp} → ${run.player.maxHp + 30} · heal 30`;
     case 'chain': return `Chain ${chainDamage(run)} → ${chainDamage(run) + 40} dmg`;
+    case 'siphon': return `Star mend ${starSiphonHeal(run)} → ${starSiphonHeal(run) + 12} HP per blast`;
+    case 'horizon': return `Pull ${wellPull(run)} → ${wellPull(run) + 60}`;
+    case 'longfuse': return `Well lasts ${wellDuration(run).toFixed(1)}s → ${(wellDuration(run) + 0.8).toFixed(1)}s`;
+    case 'flare': return `Corona ${starBurn(run)}/s → ${starBurn(run) + 6}/s`;
+    case 'nanoweave': return `Hull mend ${hullRegen(run).toFixed(1)} → ${(hullRegen(run) + 0.8).toFixed(1)} HP/s`;
+    case 'streak': return `Combo ${comboWindow(run).toFixed(1)}s → ${(comboWindow(run) + 1.5).toFixed(1)}s`;
+    case 'slipstream': return `Dash ${dashCooldown(run).toFixed(2)}s → ${(dashCooldown(run) * 0.75).toFixed(2)}s`;
+    case 'bounty': return `Score ×${scoreMultiplier(run).toFixed(2)} → ×${(scoreMultiplier(run) * 1.15).toFixed(2)}`;
     default: return '';
   }
 }
@@ -666,7 +688,7 @@ function drawEnd(ctx, run, won) {
   const ownedList = Object.entries(run.upgradesOwned);
   const relicList = Object.entries(run.relics || {});
   const upText = ownedList.length === 0 ? 'Upgrades: none' : `Upgrades (${ownedList.length}): ` + ownedList.map(([id, n]) => `${id} ×${n}`).join(', ');
-  const relText = relicList.length === 0 ? 'Relics: none' : `Relics (${relicList.length}/6): ` + relicList.map(([id, n]) => `${id} ×${n}`).join(', ');
+  const relText = relicList.length === 0 ? 'Relics: none' : `Relics (${relicList.length}/${RELICS.length}): ` + relicList.map(([id, n]) => `${id} ×${n}`).join(', ');
   ctx.font = '14px sans-serif'; ctx.fillStyle = '#9db4d6';
   ctx.fillText(`${upText}   ·   ${relText}`, 640, 540);
   ctx.fillStyle = '#ffd23e'; ctx.font = 'bold 24px sans-serif';

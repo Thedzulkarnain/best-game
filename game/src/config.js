@@ -26,13 +26,13 @@ export const WELL = {
 // Enemy kinds: name, look, behaviour. Seven kinds + two bosses, all visibly distinct.
 // No faces: geometric hulls, a single glowing eye-dot, hard outlines.
 export const ENEMY_KINDS = {
-  shard:   { name: 'Shardling',   hp: 20,  speed: 165, damage: 6,  radius: 12, score: 10, colour: '#ff6b35', behaviour: 'chaseStar',  shoot: 0 },
-  orb:     { name: 'Spitter Orb', hp: 32,  speed: 70,  damage: 7,  radius: 14, score: 20, colour: '#ff2e88', behaviour: 'spitter',    shoot: 2.6 },
-  crab:    { name: 'Hex Crab',    hp: 90,  speed: 55,  damage: 15, radius: 21, score: 30, colour: '#c77dff', behaviour: 'chaseStar',  shoot: 0, boltArmour: 0.9 },
-  serpent: { name: 'Void Serpent',hp: 46,  speed: 130, damage: 10, radius: 14, score: 25, colour: '#3dff9e', behaviour: 'weave',      shoot: 0 },
-  darter:  { name: 'Darter',      hp: 24,  speed: 210, damage: 8,  radius: 11, score: 20, colour: '#00e5ff', behaviour: 'huntPlayer', shoot: 0 },
-  leech:   { name: 'Drain Leech', hp: 38,  speed: 82,  damage: 9,  radius: 13, score: 25, colour: '#ffd23e', behaviour: 'drainStar',  shoot: 0 },
-  splitter:{ name: 'Splitter',   hp: 52,  speed: 88,  damage: 11, radius: 17, score: 30, colour: '#ff8fb3', behaviour: 'chaseStar',  shoot: 0, splits: true },
+  shard:   { name: 'Shardling',   hp: 20,  speed: 165, damage: 6,  radius: 12, score: 10, colour: '#ff6b35', behaviour: 'chaseStar',  shoot: 0, hint: 'chases the star' },
+  orb:     { name: 'Spitter Orb', hp: 32,  speed: 70,  damage: 7,  radius: 14, score: 20, colour: '#ff2e88', behaviour: 'spitter',    shoot: 2.6, hint: 'spits bolts from range' },
+  crab:    { name: 'Hex Crab',    hp: 90,  speed: 55,  damage: 15, radius: 21, score: 30, colour: '#c77dff', behaviour: 'chaseStar',  shoot: 0, boltArmour: 0.9, hint: 'plasma 10%, well only' },
+  serpent: { name: 'Void Serpent',hp: 46,  speed: 130, damage: 10, radius: 14, score: 25, colour: '#3dff9e', behaviour: 'weave',      shoot: 0, hint: 'weaves, hard to hit' },
+  darter:  { name: 'Darter',      hp: 24,  speed: 210, damage: 8,  radius: 11, score: 20, colour: '#00e5ff', behaviour: 'huntPlayer', shoot: 0, hint: 'hunts Nova, very fast' },
+  leech:   { name: 'Drain Leech', hp: 38,  speed: 82,  damage: 9,  radius: 13, score: 25, colour: '#ffd23e', behaviour: 'drainStar',  shoot: 0, hint: 'drains the star faster' },
+  splitter:{ name: 'Splitter',   hp: 52,  speed: 88,  damage: 11, radius: 17, score: 30, colour: '#ff8fb3', behaviour: 'chaseStar',  shoot: 0, splits: true, hint: 'splits in two if shot' },
   voidmaw: { name: 'VOIDMAW',    hp: 1150, speed: 58,  damage: 20, radius: 46, score: 400, colour: '#ff2e88', behaviour: 'boss',       shoot: 1.9 },
   hollowsun:{ name: 'THE HOLLOW SUN', hp: 2400, speed: 62, damage: 24, radius: 56, score: 600, colour: '#7b2fff', behaviour: 'boss', shoot: 1.6 },
 };
@@ -80,15 +80,22 @@ export const REALMS = {
   2: { name: 'EMBER DEEP', rule: 'Foes +10% speed · Wells +10% dmg' },
 };
 
-// Relics: six permanent finds, one granted by each road card between waves.
-// A relic is a lasting passive — its bonus is in the derived numbers.
+// Relics: twelve permanent finds, one granted by each road card between
+// waves. A relic is a lasting passive — its bonus is in the derived
+// numbers, so it can never be erased by a per-frame recompute.
 export const RELICS = [
-  { id: 'ember',  name: 'Ember Core',  icon: '✹', desc: 'Wells +20 dmg' },
-  { id: 'lens',   name: 'Star Lens',   icon: '◎', desc: 'Star corona +5 dmg/s' },
-  { id: 'fins',   name: 'Swift Fins',  icon: '»', desc: 'Skiff +15% speed' },
-  { id: 'magnet', name: 'Magnet Coil', icon: '◉', desc: 'Pickups drift to you' },
-  { id: 'iron',   name: 'Iron Hull',   icon: '⬢', desc: '+20 max HP, heal 20' },
-  { id: 'spark',  name: 'Chain Spark', icon: '✦', desc: 'Chain +20 dmg · +40 reach' },
+  { id: 'ember',   name: 'Ember Core',  icon: '✹', desc: 'Wells +20 dmg' },
+  { id: 'lens',    name: 'Star Lens',   icon: '◎', desc: 'Star corona +5 dmg/s' },
+  { id: 'fins',    name: 'Swift Fins',  icon: '»', desc: 'Skiff +15% speed' },
+  { id: 'magnet',  name: 'Magnet Coil', icon: '◉', desc: 'Pickups drift to you' },
+  { id: 'iron',    name: 'Iron Hull',   icon: '⬢', desc: '+20 max HP, heal 20' },
+  { id: 'spark',   name: 'Chain Spark', icon: '✦', desc: 'Chain +20 dmg · +40 reach' },
+  { id: 'anchor',  name: 'Void Anchor', icon: '⌖', desc: 'Wells pull +40' },
+  { id: 'coil',    name: 'Plasma Coil', icon: '∿', desc: 'Bolts +3 dmg' },
+  { id: 'bulwark', name: 'Bulwark',     icon: '⬡', desc: 'Damage taken −12%' },
+  { id: 'purse',   name: 'Coin Purse',  icon: '◈', desc: '+1 shard per pickup' },
+  { id: 'salvage', name: 'Salvage',     icon: '⟐', desc: 'Well kills +5 score' },
+  { id: 'starward',name: 'Starward',    icon: '✧', desc: 'Star drain −15%' },
 ];
 
 // Roads: between waves you pick where the run goes next. Each card is a
@@ -118,6 +125,14 @@ export const UPGRADES = [
   { id: 'rapid',    name: 'Overclock',    icon: '»', desc: 'Fire 18% faster', max: 3 },
   { id: 'hull',     name: 'Aegis Hull',   icon: '⬢', desc: '+30 max HP, heal 30', max: 3 },
   { id: 'chain',    name: 'Chain Nova',   icon: '✦', desc: 'Well kills chain +40 dmg nearby', max: 2 },
+  { id: 'siphon',   name: 'Star Siphon',  icon: '✚', desc: 'Wells mend the star +12 HP', max: 2 },
+  { id: 'horizon',  name: 'Event Horizon', icon: '◍', desc: 'Well pull +60', max: 3 },
+  { id: 'longfuse', name: 'Long Fuse',   icon: '◷', desc: 'Wells last +0.8s', max: 2 },
+  { id: 'flare',    name: 'Solar Flare', icon: '☀', desc: 'Star corona +6 dmg/s', max: 3 },
+  { id: 'nanoweave',name: 'Nanoweave',   icon: '▣', desc: 'Hull mends +0.8 HP/s', max: 3 },
+  { id: 'streak',   name: 'Hot Streak',  icon: '↯', desc: 'Combo lasts +1.5s', max: 2 },
+  { id: 'slipstream',name: 'Slipstream', icon: '≫', desc: 'Dash recharges 25% faster', max: 2 },
+  { id: 'bounty',   name: 'Bounty',      icon: '✪', desc: 'Score +15%', max: 3 },
 ];
 
 export const CONTROLS = [
@@ -131,12 +146,15 @@ export const CONTROLS = [
   ['R', 'Restart after win / loss'],
 ];
 
+// The title screen shows the first four of these, so the hook, the
+// armour lesson, the structure and the depth all fit on the title.
 export const FEATURES = [
   'THE WELL IS THE WEAPON: shooting thins the swarm — only a well kills',
   'HEX CRABS wear bolt-proof armour: plasma does 10%. Wells break them',
+  '7 waves — Wave 4: VOIDMAW, Wave 7: THE HOLLOW SUN (3 phases)',
+  '16 upgrades pick 1 of 3 between waves · 12 relics ride the roads',
   'Splitters multiply if shot — group them in a well and detonate together',
   'Wave 5 arrives in tight clusters; a well past the star drags the swarm',
-  '7 waves — Wave 4: VOIDMAW, Wave 7: THE HOLLOW SUN (3 phases)',
-  '7 enemy kinds + 2 bosses, 8 upgrades pick 1 of 3 between waves',
+  '7 enemy kinds + 2 bosses, a permanent workshop, 3 difficulties',
   'Defend the newborn star AND your skiff — lose either, lose the run',
 ];
