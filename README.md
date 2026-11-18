@@ -5,7 +5,7 @@
 [![reward](https://make.fun/badge/best-game-01/Thedzulkarnain/best-game/reward.svg)](https://make.fun/bounty/best-game-01?utm_source=github&utm_medium=readme&utm_campaign=best-game-01)
 
 
-**STARWELL — Gravity Forge: throw wells that drag whole swarms together, then detonate — 2 realms, branching road, 2 bosses, 8 upgrades, 6 relics, 3 difficulties**
+**STARWELL: throw wells that drag whole swarms together, then detonate; 2 realms, branching road, 2 bosses, 16 upgrades, 12 relics, a permanent workshop**
 
 You are Nova, a skiff defending a newborn star at the heart of a dark nebula. Void creatures crawl in to eat the star. Fire plasma to thin the swarm — but the well is the weapon: throw a gravity well and it drags whole clusters together, then detonates them. Hex Crabs wear bolt-proof armour (plasma does 10%), so only a well kills them. Defend the star **and** your hull — lose either, lose the run.
 
@@ -32,8 +32,8 @@ Between waves you pick **one upgrade and one road**: the road changes the next w
 - **7 waves** across **2 realms**: the Nebula Reach (waves 1–4) and the Ember Deep (waves 5–7, where foes are 10% faster and wells hit 10% harder)
 - **2 bosses**: VOIDMAW (wave 4) and THE HOLLOW SUN (wave 7, 3 phases with named attacks)
 - **7 enemy kinds**: Shardling, Spitter Orb, Hex Crab, Void Serpent, Darter, Drain Leech, Splitter
-- **8 upgrades**, pick 1 of 3 between waves (Wide Well, Nova Burst, Twin Wells, Hot Plasma, Split Cannon, Overclock, Aegis Hull, Chain Nova)
-- **6 relics**, one granted by each road card (Ember Core, Star Lens, Swift Fins, Magnet Coil, Iron Hull, Chain Spark)
+- **16 upgrades**, pick 1 of 3 between waves (Wide Well, Nova Burst, Twin Wells, Hot Plasma, Split Cannon, Overclock, Aegis Hull, Chain Nova, Star Siphon, Event Horizon, Long Fuse, Solar Flare, Nanoweave, Hot Streak, Slipstream, Bounty)
+- **12 relics**, one granted by each road card (Ember Core, Star Lens, Swift Fins, Magnet Coil, Iron Hull, Chain Spark, Void Anchor, Plasma Coil, Bulwark, Coin Purse, Salvage, Starward)
 - **3 difficulties**: Easy, Normal, Hard (foe HP/damage/speed and hull 150/120/100)
 - **Branching road** between waves, with a road map (wave rail) in the HUD
 - **Rank** (S/A/B/C), stats grid, and 6 achievements on the victory screen
