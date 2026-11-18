@@ -1,6 +1,7 @@
-// SPOREKEEPER — Bloom Siege, a best-game-01 entry (Node 22, stdlib only).
-// Original game written in this session: a night-garden wave defence where
-// Pip the keeper protects the Heartseed through 7 waves and a boss.
+// STARWELL — Gravity Forge, a best-game-01 entry (Node 22, stdlib only).
+// Original game written in this session: Nova the skiff defends a newborn
+// star in a dark nebula through 7 waves and two bosses, throwing gravity
+// wells that pull whole swarms together and then detonate them.
 // The game is plain static files under game/ (index.html + ES modules, no
 // library, no network request). This program hands it in: it copies game/
 // and screenshots/ from beside this file to /output and writes
